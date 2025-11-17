@@ -5,21 +5,77 @@ on:
     branches: [ main ]
 
 jobs:
-  verify-structure:
+  test-calc-service:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Verify project structure
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install Newman
+      run: npm install -g newman
+
+    - name: Build and test calc service
       run: |
-        echo "=== VERIFICA STRUTTURA ==="
-        ls -la
-        echo "=== MICROASE7 ==="
-        ls -la microase7/
-        echo "=== SRC ==="
-        ls -la microase7/src/
-        echo "=== TESTS ==="
-        ls -la microase7/tests/
-        echo "=== DOCKERFILES ==="
-        find . -name "Dockerfile" -type f
+        cd microase7/src/calc
+        docker build -t calc .
+        docker run -d -p 5001:5000 --name calc_test calc
+        sleep 10
+        newman run ../../tests/calc_ut.postman_collection.json
+        docker stop calc_test
+        docker rm calc_test
+
+  test-string-service:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install Newman
+      run: npm install -g newman
+
+    - name: Build and test string service
+      run: |
+        cd microase7/src/string
+        docker build -t string .
+        docker run -d -p 5002:5000 --name string_test string
+        sleep 10
+        newman run ../../tests/string_ut.postman_collection.json
+        docker stop string_test
+        docker rm string_test
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [test-calc-service, test-string-service]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Start all services
+      run: |
+        cd microase7/src
+        docker-compose up -d
+
+    - name: Wait for services to be ready
+      run: sleep 30
+
+    - name: Install Newman
+      run: npm install -g newman
+
+    - name: Run integration tests
+      run: newman run microase7/tests/integration.postman_collection.json
+
+    - name: Stop services
+      if: always()
+      run: |
+        cd microase7/src
+        docker-compose down
