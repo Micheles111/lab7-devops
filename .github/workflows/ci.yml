@@ -1,1 +1,25 @@
+name: Microservice CI Pipeline
 
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  verify-structure:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Verify project structure
+      run: |
+        echo "=== VERIFICA STRUTTURA ==="
+        ls -la
+        echo "=== MICROASE7 ==="
+        ls -la microase7/
+        echo "=== SRC ==="
+        ls -la microase7/src/
+        echo "=== TESTS ==="
+        ls -la microase7/tests/
+        echo "=== DOCKERFILES ==="
+        find . -name "Dockerfile" -type f
