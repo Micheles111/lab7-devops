@@ -19,15 +19,36 @@ jobs:
     - name: Install Newman
       run: npm install -g newman
 
-    - name: Build and test calc service
+    - name: Build calc service
       run: |
         cd microase7/src/calc
         docker build -t calc .
+
+    - name: Run calc container
+      run: |
         docker run -d -p 5001:5000 --name calc_test calc
-        sleep 10
-        newman run ../../tests/calc_ut.postman_collection.json
-        docker stop calc_test
-        docker rm calc_test
+        sleep 15
+
+    - name: Debug container status
+      run: |
+        echo "=== CONTAINER STATUS ==="
+        docker ps
+        echo "=== CONTAINER LOGS ==="
+        docker logs calc_test || echo "No logs yet"
+
+    - name: Run calc tests on correct port
+      run: |
+        # Modifica temporanea della collection per usare la porta 5001
+        cd microase7/tests
+        cp calc_ut.postman_collection.json calc_ut_temp.json
+        sed -i 's/localhost:5000/localhost:5001/g' calc_ut_temp.json
+        newman run calc_ut_temp.json --verbose
+
+    - name: Stop calc container
+      if: always()
+      run: |
+        docker stop calc_test || true
+        docker rm calc_test || true
 
   test-string-service:
     runs-on: ubuntu-latest
@@ -43,15 +64,35 @@ jobs:
     - name: Install Newman
       run: npm install -g newman
 
-    - name: Build and test string service
+    - name: Build string service
       run: |
         cd microase7/src/string
         docker build -t string .
+
+    - name: Run string container
+      run: |
         docker run -d -p 5002:5000 --name string_test string
-        sleep 10
-        newman run ../../tests/string_ut.postman_collection.json
-        docker stop string_test
-        docker rm string_test
+        sleep 15
+
+    - name: Debug container status
+      run: |
+        echo "=== CONTAINER STATUS ==="
+        docker ps
+        echo "=== CONTAINER LOGS ==="
+        docker logs string_test || echo "No logs yet"
+
+    - name: Run string tests on correct port
+      run: |
+        cd microase7/tests
+        cp string_ut.postman_collection.json string_ut_temp.json
+        sed -i 's/localhost:5000/localhost:5002/g' string_ut_temp.json
+        newman run string_ut_temp.json --verbose
+
+    - name: Stop string container
+      if: always()
+      run: |
+        docker stop string_test || true
+        docker rm string_test || true
 
   integration-test:
     runs-on: ubuntu-latest
@@ -66,13 +107,18 @@ jobs:
         docker-compose up -d
 
     - name: Wait for services to be ready
-      run: sleep 30
+      run: |
+        sleep 30
+        echo "=== ALL CONTAINERS ==="
+        docker ps
 
     - name: Install Newman
       run: npm install -g newman
 
     - name: Run integration tests
-      run: newman run microase7/tests/integration.postman_collection.json
+      run: |
+        # Per integration test usiamo la porta originale (5000)
+        newman run microase7/tests/integration.postman_collection.json --verbose
 
     - name: Stop services
       if: always()
